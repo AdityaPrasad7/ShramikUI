@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import type { ComponentType } from 'react';
 import type { ApexOptions } from 'apexcharts';
 import ReactApexChart from 'react-apexcharts';
 import { useDispatch, useSelector } from 'react-redux';
 import { setPageTitle } from '../../../../store/themeConfigSlice';
 import { IRootState } from '../../../../store';
-import IconSearch from '../../../../components/Icon/IconSearch';
 import IconCalendar from '../../../../components/Icon/IconCalendar';
 import IconUsersGroup from '../../../../components/Icon/IconUsersGroup';
 import IconUsers from '../../../../components/Icon/IconUsers';
@@ -13,6 +12,14 @@ import IconClipboardText from '../../../../components/Icon/IconClipboardText';
 import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/flatpickr.css';
 import 'flatpickr/dist/themes/airbnb.css';
+import Swal from 'sweetalert2';
+import {
+    getDashboardStats,
+    getUserDistribution,
+    getRecentTransactions,
+    type UserDistributionItem,
+    type TransactionItem,
+} from '../../../../api/admin/dashboardApi';
 
 type SummaryCard = {
     label: string;
@@ -21,14 +28,6 @@ type SummaryCard = {
     tone: 'positive' | 'neutral' | 'negative';
     Icon: ComponentType<{ className?: string }>;
     iconStyles: string;
-};
-
-type PurchaseRow = {
-    user: string;
-    package: string;
-    amount: string;
-    date: string;
-    status: 'Completed' | 'Processing';
 };
 
 type FeedbackRow = {
@@ -47,9 +46,117 @@ const Index = () => {
     const [isDatePickerOpen, setDatePickerOpen] = useState(false);
     const dateRangeWrapperRef = useRef<HTMLDivElement | null>(null);
 
+    // API data states
+    const [isLoading, setIsLoading] = useState(true);
+    const [statsData, setStatsData] = useState<{
+        totalUsers: { count: number; growth: number; growthLabel: string };
+        totalRecruiters: { count: number; growth: number; growthLabel: string };
+        activeJobs: { count: number; growth: number; growthLabel: string };
+    } | null>(null);
+    const [userDistribution, setUserDistribution] = useState<UserDistributionItem[]>([]);
+    const [transactions, setTransactions] = useState<TransactionItem[]>([]);
+    const [transactionPage, setTransactionPage] = useState(1);
+    const [hasMoreTransactions, setHasMoreTransactions] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const transactionsContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // Format date for API
+    const formatDateForApi = (date: Date): string => {
+        return date.toISOString().split('T')[0];
+    };
+
+    // Fetch all dashboard data
+    const fetchDashboardData = useCallback(async () => {
+        setIsLoading(true);
+        setTransactionPage(1);
+        setHasMoreTransactions(true);
+        try {
+            const params: { startDate?: string; endDate?: string } = {};
+            if (dateRange.length === 2) {
+                params.startDate = formatDateForApi(dateRange[0]);
+                params.endDate = formatDateForApi(dateRange[1]);
+            }
+
+            const [statsRes, distributionRes, transactionsRes] = await Promise.all([
+                getDashboardStats(params),
+                getUserDistribution(params),
+                getRecentTransactions({ ...params, page: 1, limit: 10 }),
+            ]);
+
+            if (statsRes.success && statsRes.data) {
+                setStatsData(statsRes.data.stats);
+            }
+
+            if (distributionRes.success && distributionRes.data) {
+                setUserDistribution(distributionRes.data.userMix);
+            }
+
+            if (transactionsRes.success && transactionsRes.data) {
+                setTransactions(transactionsRes.data.transactions);
+                setHasMoreTransactions(transactionsRes.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to fetch dashboard data:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to load dashboard data. Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [dateRange]);
+
+    // Load more transactions
+    const loadMoreTransactions = useCallback(async () => {
+        if (isLoadingMore || !hasMoreTransactions) return;
+
+        setIsLoadingMore(true);
+        try {
+            const params: { startDate?: string; endDate?: string; page: number; limit: number } = {
+                page: transactionPage + 1,
+                limit: 10,
+            };
+            if (dateRange.length === 2) {
+                params.startDate = formatDateForApi(dateRange[0]);
+                params.endDate = formatDateForApi(dateRange[1]);
+            }
+
+            const transactionsRes = await getRecentTransactions(params);
+
+            if (transactionsRes.success && transactionsRes.data) {
+                setTransactions((prev) => [...prev, ...transactionsRes.data!.transactions]);
+                setTransactionPage((prev) => prev + 1);
+                setHasMoreTransactions(transactionsRes.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to load more transactions:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [dateRange, transactionPage, isLoadingMore, hasMoreTransactions]);
+
+    // Handle scroll for infinite loading
+    const handleTransactionsScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.target as HTMLDivElement;
+        const scrollThreshold = 50;
+        if (target.scrollHeight - target.scrollTop - target.clientHeight < scrollThreshold) {
+            loadMoreTransactions();
+        }
+    }, [loadMoreTransactions]);
+
     useEffect(() => {
         dispatch(setPageTitle('Dashboard'));
     }, [dispatch]);
+
+    // Fetch data on mount and when date range changes
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
     useEffect(() => {
         if (!isDatePickerOpen) {
@@ -85,40 +192,45 @@ const Index = () => {
 
     const isDark = useSelector((state: IRootState) => state.themeConfig.theme === 'dark' || state.themeConfig.isDarkMode);
 
-    const summaryCards: SummaryCard[] = [
+    // Helper to determine tone from growth value
+    const getToneFromGrowth = (growth: number, label: string): 'positive' | 'neutral' | 'negative' => {
+        if (label.toLowerCase().includes('stable')) return 'neutral';
+        if (growth > 0) return 'positive';
+        if (growth < 0) return 'negative';
+        return 'neutral';
+    };
+
+    // Format number with commas
+    const formatNumber = (num: number): string => {
+        return num.toLocaleString('en-IN');
+    };
+
+    const summaryCards: SummaryCard[] = useMemo(() => [
         {
             label: 'Total Users',
-            value: '15,450',
-            change: '+10% from last month',
-            tone: 'positive',
+            value: statsData ? formatNumber(statsData.totalUsers.count) : '—',
+            change: statsData?.totalUsers.growthLabel || 'Loading...',
+            tone: statsData ? getToneFromGrowth(statsData.totalUsers.growth, statsData.totalUsers.growthLabel) : 'neutral',
             Icon: IconUsersGroup,
             iconStyles: 'bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300',
         },
         {
             label: 'Total Recruiters',
-            value: '3,200',
-            change: '+5% from last month',
-            tone: 'positive',
+            value: statsData ? formatNumber(statsData.totalRecruiters.count) : '—',
+            change: statsData?.totalRecruiters.growthLabel || 'Loading...',
+            tone: statsData ? getToneFromGrowth(statsData.totalRecruiters.growth, statsData.totalRecruiters.growthLabel) : 'neutral',
             Icon: IconUsers,
             iconStyles: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300',
         },
         {
             label: 'Active Jobs',
-            value: '1,850',
-            change: 'Stable since last week',
-            tone: 'neutral',
+            value: statsData ? formatNumber(statsData.activeJobs.count) : '—',
+            change: statsData?.activeJobs.growthLabel || 'Loading...',
+            tone: statsData ? getToneFromGrowth(statsData.activeJobs.growth, statsData.activeJobs.growthLabel) : 'neutral',
             Icon: IconClipboardText,
             iconStyles: 'bg-sky-100 text-sky-600 dark:bg-sky-500/10 dark:text-sky-300',
         },
-    ];
-
-    const recentPurchases: PurchaseRow[] = [
-        { user: 'Arjun Kumar', package: 'Starter Pack', amount: '₹ 250', date: '2024-07-28', status: 'Completed' },
-        { user: 'Meera Devi', package: 'Pro Bundle', amount: '₹ 999', date: '2024-07-27', status: 'Completed' },
-        { user: 'Sanjay Dutt', package: 'Basic Plan', amount: '₹ 150', date: '2024-07-27', status: 'Processing' },
-        { user: 'Pooja Rani', package: 'Ultimate Deal', amount: '₹ 1999', date: '2024-07-26', status: 'Completed' },
-        { user: 'Vikram Sharma', package: 'Starter Pack', amount: '₹ 250', date: '2024-07-26', status: 'Completed' },
-    ];
+    ], [statsData]);
 
     const recentFeedback: FeedbackRow[] = [
         {
@@ -168,6 +280,18 @@ const Index = () => {
         [isDark],
     );
 
+    // Calculate chart data from userDistribution
+    const chartData = useMemo(() => {
+        if (userDistribution.length === 0) {
+            return { series: [0], labels: ['No Data'], percentages: [0] };
+        }
+        const total = userDistribution.reduce((acc, item) => acc + item.count, 0);
+        const series = userDistribution.map((item) => item.count);
+        const labels = userDistribution.map((item) => item.label);
+        const percentages = userDistribution.map((item) => (total > 0 ? Math.round((item.count / total) * 100) : 0));
+        return { series, labels, percentages };
+    }, [userDistribution]);
+
     const userMixChart = useMemo(() => {
         const options: ApexOptions = {
             chart: {
@@ -182,14 +306,18 @@ const Index = () => {
             dataLabels: {
                 enabled: false,
             },
-            colors: userMixColors,
-            labels: ['ND (Non-Degree)', 'ITI (Industrial Training Institute)', 'Diploma'],
+            colors: userMixColors.slice(0, chartData.labels.length),
+            labels: chartData.labels,
             legend: {
                 show: false,
             },
             tooltip: {
                 y: {
-                    formatter: (val: number) => `${Math.round(val)}%`,
+                    formatter: (val: number) => {
+                        const total = chartData.series.reduce((a, b) => a + b, 0);
+                        const percentage = total > 0 ? Math.round((val / total) * 100) : 0;
+                        return `${val} (${percentage}%)`;
+                    },
                 },
             },
             plotOptions: {
@@ -210,7 +338,11 @@ const Index = () => {
                                 fontWeight: 600,
                                 offsetY: 0,
                                 color: isDark ? '#f8fafc' : '#0f172a',
-                                formatter: (val: string) => `${Math.round(Number(val))}%`,
+                                formatter: (val: string) => {
+                                    const total = chartData.series.reduce((a, b) => a + b, 0);
+                                    const percentage = total > 0 ? Math.round((Number(val) / total) * 100) : 0;
+                                    return `${percentage}%`;
+                                },
                             },
                             total: {
                                 show: false,
@@ -232,20 +364,28 @@ const Index = () => {
         };
 
         return {
-            series: [45, 35, 20],
+            series: chartData.series,
             options,
         };
-    }, [isDark, userMixColors]);
+    }, [isDark, userMixColors, chartData]);
 
-    const userMixLegend = [
-        { label: 'ND (Non-Degree)', color: userMixColors[0] },
-        { label: 'ITI (Industrial Training Institute)', color: userMixColors[1] },
-        { label: 'Diploma', color: userMixColors[2] },
-    ];
+    const userMixLegend = useMemo(() => {
+        return chartData.labels.map((label, index) => ({
+            label,
+            color: userMixColors[index % userMixColors.length],
+        }));
+    }, [chartData.labels, userMixColors]);
 
-    const statusStyles: Record<PurchaseRow['status'], string> = {
+    const statusStyles: Record<string, string> = {
         Completed: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-200',
         Processing: 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-200',
+        Failed: 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-200',
+    };
+
+    // Format date for display
+    const formatDateDisplay = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
     };
 
     const sentimentStyles: Record<FeedbackRow['sentiment'], string> = {
@@ -268,14 +408,14 @@ const Index = () => {
                     <h1 className="mt-2 text-3xl font-semibold text-slate-900 dark:text-white">Dashboard Overview</h1>
                 </div>
                 <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-                    <label className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus-within:ring-2 focus-within:ring-primary/30 dark:border-slate-700 dark:bg-slate-900 sm:w-auto">
+                    {/* <label className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm focus-within:ring-2 focus-within:ring-primary/30 dark:border-slate-700 dark:bg-slate-900 sm:w-auto">
                         <IconSearch className="h-4 w-4 text-slate-400 dark:text-slate-500" />
                         <input
                             type="text"
                             placeholder="Search"
                             className="flex-1 bg-transparent text-sm text-slate-600 placeholder:text-slate-400 focus:outline-none dark:text-slate-200 sm:w-44"
                         />
-                    </label>
+                    </label> */}
                     <div ref={dateRangeWrapperRef} className="relative w-full sm:w-auto">
                         <button
                             type="button"
@@ -386,38 +526,78 @@ const Index = () => {
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Latest transactions from your talent marketplace.</p>
                             </div>
                         </header>
-                        <div className="mt-6 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
+                        <div
+                            ref={transactionsContainerRef}
+                            onScroll={handleTransactionsScroll}
+                            className="mt-6 max-h-[400px] overflow-y-auto overflow-x-hidden rounded-xl border border-slate-200 dark:border-slate-700"
+                        >
                             <div className="overflow-x-auto">
                                 <table className="min-w-[640px] divide-y divide-slate-200 text-left dark:divide-slate-700 md:min-w-full">
-                                <thead className="bg-slate-50 dark:bg-slate-800/60">
-                                    <tr className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
-                                        <th className="px-6 py-3">User</th>
-                                        <th className="px-6 py-3">Package</th>
-                                        <th className="px-6 py-3">Amount</th>
-                                        <th className="px-6 py-3">Date</th>
-                                        <th className="px-6 py-3 text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
-                                    {recentPurchases.map((purchase) => (
-                                        <tr
-                                            key={purchase.user}
-                                            className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
-                                        >
-                                            <td className="px-6 py-4 font-medium">{purchase.user}</td>
-                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{purchase.package}</td>
-                                            <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{purchase.amount}</td>
-                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{purchase.date}</td>
-                                            <td className="px-6 py-4 text-right">
-                                                <span
-                                                    className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[purchase.status]}`}
-                                                >
-                                                    {purchase.status}
-                                                </span>
-                                            </td>
+                                    <thead className="bg-slate-50 dark:bg-slate-800/60 sticky top-0 z-10">
+                                        <tr className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+                                            <th className="px-6 py-3">User</th>
+                                            <th className="px-6 py-3">Package</th>
+                                            <th className="px-6 py-3">Amount</th>
+                                            <th className="px-6 py-3">Date</th>
+                                            <th className="px-6 py-3 text-right">Status</th>
                                         </tr>
-                                    ))}
-                                </tbody>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
+                                        {isLoading ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                                    Loading transactions...
+                                                </td>
+                                            </tr>
+                                        ) : transactions.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                                    No transactions found
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            <>
+                                                {transactions.map((transaction) => (
+                                                    <tr
+                                                        key={transaction._id}
+                                                        className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                                                    >
+                                                        <td className="px-6 py-4 font-medium">{transaction.user}</td>
+                                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{transaction.package}</td>
+                                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{transaction.amount}</td>
+                                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{formatDateDisplay(transaction.date)}</td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <span
+                                                                className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[transaction.status] || 'bg-slate-100 text-slate-600'}`}
+                                                            >
+                                                                {transaction.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {isLoadingMore && (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-6 py-4 text-center text-slate-500">
+                                                            <div className="flex items-center justify-center gap-2">
+                                                                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                                </svg>
+                                                                Loading more...
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                                {!hasMoreTransactions && transactions.length > 0 && (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-6 py-3 text-center text-xs text-slate-400">
+                                                            No more transactions
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </>
+                                        )}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>

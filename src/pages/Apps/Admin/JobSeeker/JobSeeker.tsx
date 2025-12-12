@@ -1,56 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { setPageTitle } from '../../../../store/themeConfigSlice';
-
-const jobSummary = [
-    { label: 'Active Profiles', value: '12,845', helper: '+560 this week' },
-    { label: 'Interviews Scheduled', value: '320', helper: 'Across 65 recruiters' },
-    { label: 'Offers Extended', value: '148', helper: '+9.4% conversion' },
-    { label: 'Skills Verified', value: '7,230', helper: 'Updated in last 30 days' },
-];
-
-const jobSeekers = [
-    {
-        name: 'Ananya Verma',
-        specialization: 'Full Stack Developer',
-        availability: 'Immediate',
-        lastActive: '2024-07-30',
-        status: 'Interviewing',
-        category: 'ND',
-    },
-    {
-        name: 'Rahul Mishra',
-        specialization: 'Mechanical Engineer',
-        availability: '2 Weeks',
-        lastActive: '2024-07-29',
-        status: 'Offer Extended',
-        category: 'ITI',
-    },
-    {
-        name: 'Swati Gupta',
-        specialization: 'Digital Marketer',
-        availability: 'Immediate',
-        lastActive: '2024-07-28',
-        status: 'Profile Review',
-        category: 'Diploma',
-    },
-    {
-        name: 'Karan Singh',
-        specialization: 'Data Analyst',
-        availability: 'Notice Period',
-        lastActive: '2024-07-27',
-        status: 'Interviewing',
-        category: 'ND',
-    },
-    {
-        name: 'Heena Sharma',
-        specialization: 'UI/UX Designer',
-        availability: 'Immediate',
-        lastActive: '2024-07-26',
-        status: 'Shortlisted',
-        category: 'Diploma',
-    },
-];
+import Swal from 'sweetalert2';
+import {
+    getJobSeekerStats,
+    getTopJobSeekers,
+    getJobSeekerCategories,
+    type JobSeekerItem,
+} from '../../../../api/admin/jobSeekerApi';
 
 const statusStyles: Record<string, string> = {
     Interviewing: 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-200',
@@ -59,22 +16,182 @@ const statusStyles: Record<string, string> = {
     Shortlisted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200',
 };
 
+interface StatsData {
+    activeProfiles: { count: number; growthLabel: string };
+    interviewsScheduled: { count: number; subLabel: string };
+    offersExtended: { count: number; growthLabel: string };
+    skillsVerified: { count: number; subLabel: string };
+}
+
 const JobSeeker = () => {
     const dispatch = useDispatch();
-    const [selectedCategory, setSelectedCategory] = useState<'All' | 'ND' | 'ITI' | 'Diploma'>('All');
+    const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [categories, setCategories] = useState<string[]>(['All']);
+
+    // API data states
+    const [isLoading, setIsLoading] = useState(true);
+    const [statsData, setStatsData] = useState<StatsData | null>(null);
+    const [jobSeekers, setJobSeekers] = useState<JobSeekerItem[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasMoreJobSeekers, setHasMoreJobSeekers] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // Format number with commas
+    const formatNumber = (num: number): string => {
+        return num.toLocaleString('en-IN');
+    };
+
+    // Format date for display
+    const formatDateDisplay = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
+    // Fetch categories
+    const fetchCategories = useCallback(async () => {
+        try {
+            const res = await getJobSeekerCategories();
+            if (res.success && res.data) {
+                setCategories(res.data.categories);
+            }
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        }
+    }, []);
+
+    // Fetch stats
+    const fetchStats = useCallback(async () => {
+        try {
+            const res = await getJobSeekerStats();
+            if (res.success && res.data) {
+                setStatsData(res.data.stats);
+            }
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+        }
+    }, []);
+
+    // Fetch job seekers
+    const fetchJobSeekers = useCallback(async (resetList = true) => {
+        if (resetList) {
+            setIsLoading(true);
+            setCurrentPage(1);
+            setHasMoreJobSeekers(true);
+        }
+
+        try {
+            const res = await getTopJobSeekers({
+                page: resetList ? 1 : currentPage,
+                limit: 10,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
+            });
+
+            if (res.success && res.data) {
+                if (resetList) {
+                    setJobSeekers(res.data.jobSeekers);
+                } else {
+                    setJobSeekers((prev) => [...prev, ...res.data!.jobSeekers]);
+                }
+                setHasMoreJobSeekers(res.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to fetch job seekers:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to load job seekers. Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [selectedCategory, currentPage]);
+
+    // Load more job seekers
+    const loadMoreJobSeekers = useCallback(async () => {
+        if (isLoadingMore || !hasMoreJobSeekers) return;
+
+        setIsLoadingMore(true);
+        try {
+            const nextPage = currentPage + 1;
+            const res = await getTopJobSeekers({
+                page: nextPage,
+                limit: 10,
+                category: selectedCategory !== 'All' ? selectedCategory : undefined,
+            });
+
+            if (res.success && res.data) {
+                setJobSeekers((prev) => [...prev, ...res.data!.jobSeekers]);
+                setCurrentPage(nextPage);
+                setHasMoreJobSeekers(res.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to load more job seekers:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [selectedCategory, currentPage, isLoadingMore, hasMoreJobSeekers]);
+
+    // Handle scroll for infinite loading
+    const handleTableScroll = useCallback(
+        (e: React.UIEvent<HTMLDivElement>) => {
+            const target = e.target as HTMLDivElement;
+            const scrollThreshold = 50;
+            if (target.scrollHeight - target.scrollTop - target.clientHeight < scrollThreshold) {
+                loadMoreJobSeekers();
+            }
+        },
+        [loadMoreJobSeekers]
+    );
 
     useEffect(() => {
         dispatch(setPageTitle('Job Seekers'));
-    }, [dispatch]);
+        fetchCategories();
+        fetchStats();
+    }, [dispatch, fetchCategories, fetchStats]);
 
-    const cards = useMemo(() => jobSummary, []);
-
-    const filteredJobSeekers = useMemo(() => {
-        if (selectedCategory === 'All') {
-            return jobSeekers;
-        }
-        return jobSeekers.filter((seeker) => seeker.category === selectedCategory);
+    // Fetch job seekers when category changes
+    useEffect(() => {
+        fetchJobSeekers(true);
     }, [selectedCategory]);
+
+    const cards = useMemo(() => {
+        if (!statsData) {
+            return [
+                { label: 'Active Profiles', value: '—', helper: 'Loading...' },
+                { label: 'Interviews Scheduled', value: '—', helper: 'Loading...' },
+                { label: 'Offers Extended', value: '—', helper: 'Loading...' },
+                { label: 'Skills Verified', value: '—', helper: 'Loading...' },
+            ];
+        }
+
+        return [
+            {
+                label: 'Active Profiles',
+                value: formatNumber(statsData.activeProfiles.count),
+                helper: statsData.activeProfiles.growthLabel,
+            },
+            {
+                label: 'Interviews Scheduled',
+                value: formatNumber(statsData.interviewsScheduled.count),
+                helper: statsData.interviewsScheduled.subLabel,
+            },
+            {
+                label: 'Offers Extended',
+                value: formatNumber(statsData.offersExtended.count),
+                helper: statsData.offersExtended.growthLabel,
+            },
+            {
+                label: 'Skills Verified',
+                value: formatNumber(statsData.skillsVerified.count),
+                helper: statsData.skillsVerified.subLabel,
+            },
+        ];
+    }, [statsData]);
 
     return (
         <div className="space-y-8">
@@ -108,21 +225,32 @@ const JobSeeker = () => {
                         <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Filter by category:</span>
                         <select
                             value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value as 'All' | 'ND' | 'ITI' | 'Diploma')}
+                            onChange={(e) => setSelectedCategory(e.target.value)}
                             className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
                         >
-                            <option value="All">All</option>
-                            <option value="ND">ND (Non-Degree)</option>
-                            <option value="ITI">ITI (Industrial Training Institute)</option>
-                            <option value="Diploma">Diploma</option>
+                            {categories.map((cat) => (
+                                <option key={cat} value={cat}>
+                                    {cat === 'Non-Degree Holder'
+                                        ? 'ND (Non-Degree)'
+                                        : cat === 'ITI Holder'
+                                            ? 'ITI (Industrial Training Institute)'
+                                            : cat === 'Diploma Holder'
+                                                ? 'Diploma'
+                                                : cat}
+                                </option>
+                            ))}
                         </select>
                     </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                <div
+                    ref={tableContainerRef}
+                    onScroll={handleTableScroll}
+                    className="max-h-[500px] overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200 dark:border-slate-700"
+                >
                     <div className="overflow-x-auto">
                         <table className="min-w-[720px] divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
-                            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-300">
+                            <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-300">
                                 <tr>
                                     <th className="px-6 py-3">Name</th>
                                     <th className="px-6 py-3">Specialization</th>
@@ -132,19 +260,90 @@ const JobSeeker = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
-                                {filteredJobSeekers.map((seeker) => (
-                                    <tr key={seeker.name} className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70">
-                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{seeker.name}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{seeker.specialization}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{seeker.availability}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{seeker.lastActive}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[seeker.status]}`}>
-                                                {seeker.status}
-                                            </span>
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                            Loading job seekers...
                                         </td>
                                     </tr>
-                                ))}
+                                ) : jobSeekers.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                            No job seekers found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <>
+                                        {jobSeekers.map((seeker) => (
+                                            <tr
+                                                key={seeker._id}
+                                                className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {seeker.profilePhoto ? (
+                                                            <img
+                                                                src={seeker.profilePhoto}
+                                                                alt={seeker.name}
+                                                                className="h-8 w-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                                                {seeker.name.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                        <span className="font-medium text-slate-900 dark:text-white">{seeker.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{seeker.specialization}</td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{seeker.availability}</td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">
+                                                    {formatDateDisplay(seeker.lastActive)}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[seeker.status] || 'bg-slate-100 text-slate-600'
+                                                            }`}
+                                                    >
+                                                        {seeker.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {isLoadingMore && (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-4 text-center text-slate-500">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                                            <circle
+                                                                className="opacity-25"
+                                                                cx="12"
+                                                                cy="12"
+                                                                r="10"
+                                                                stroke="currentColor"
+                                                                strokeWidth="4"
+                                                                fill="none"
+                                                            />
+                                                            <path
+                                                                className="opacity-75"
+                                                                fill="currentColor"
+                                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                            />
+                                                        </svg>
+                                                        Loading more...
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {!hasMoreJobSeekers && jobSeekers.length > 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-3 text-center text-xs text-slate-400">
+                                                    No more job seekers
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
+                                )}
                             </tbody>
                         </table>
                     </div>

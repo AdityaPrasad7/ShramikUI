@@ -1,56 +1,12 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { setPageTitle } from '../../../../store/themeConfigSlice';
-
-const recruiterSummary = [
-    { label: 'Active Recruiters', value: '860', helper: '+45 onboarded this month' },
-    { label: 'Open Positions', value: '3,420', helper: 'Across 214 companies' },
-    { label: 'Interviews Conducted', value: '1,980', helper: '+12% week-over-week' },
-    { label: 'Hires Confirmed', value: '642', helper: 'Placement success rate 33%' },
-];
-
-const recruiterActivity = [
-    {
-        company: 'BrightTech Solutions',
-        recruiter: 'Neeraj Kapoor',
-        focus: 'Software Engineering',
-        interviews: 28,
-        updatedAt: '2024-07-30',
-        status: 'Hiring Frenzy',
-    },
-    {
-        company: 'FutureBuild Infra',
-        recruiter: 'Sanya Mehta',
-        focus: 'Civil Engineering',
-        interviews: 12,
-        updatedAt: '2024-07-29',
-        status: 'Active Shortlisting',
-    },
-    {
-        company: 'CarePlus Hospitals',
-        recruiter: 'Dr. Ravi Rao',
-        focus: 'Healthcare & Nursing',
-        interviews: 19,
-        updatedAt: '2024-07-28',
-        status: 'Interviewing',
-    },
-    {
-        company: 'EcoRide Mobility',
-        recruiter: 'Anita Joshi',
-        focus: 'Automobile Trades',
-        interviews: 15,
-        updatedAt: '2024-07-27',
-        status: 'New Openings',
-    },
-    {
-        company: 'SkillBridge Consulting',
-        recruiter: 'Vikram Tyagi',
-        focus: 'Management Roles',
-        interviews: 22,
-        updatedAt: '2024-07-26',
-        status: 'Shortlisting',
-    },
-];
+import Swal from 'sweetalert2';
+import {
+    getRecruiterStats,
+    getRecruiterActivity,
+    type RecruiterActivityItem,
+} from '../../../../api/admin/recruiterApi';
 
 const statusStyles: Record<string, string> = {
     'Hiring Frenzy': 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200',
@@ -60,14 +16,149 @@ const statusStyles: Record<string, string> = {
     Shortlisting: 'bg-slate-200 text-slate-700 dark:bg-slate-500/10 dark:text-slate-200',
 };
 
+interface StatsData {
+    activeRecruiters: { count: number; growthLabel: string };
+    openPositions: { count: number; subLabel: string };
+    interviewsConducted: { count: number; growthLabel: string };
+    hiresConfirmed: { count: number; growthLabel: string };
+}
+
 const Recruiter = () => {
     const dispatch = useDispatch();
 
+    // API data states
+    const [isLoading, setIsLoading] = useState(true);
+    const [statsData, setStatsData] = useState<StatsData | null>(null);
+    const [recruiters, setRecruiters] = useState<RecruiterActivityItem[]>([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [hasMoreRecruiters, setHasMoreRecruiters] = useState(true);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const tableContainerRef = useRef<HTMLDivElement | null>(null);
+
+    // Format number with commas
+    const formatNumber = (num: number): string => {
+        return num.toLocaleString('en-IN');
+    };
+
+    // Format date for display
+    const formatDateDisplay = (dateString: string): string => {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
+    // Fetch stats
+    const fetchStats = useCallback(async () => {
+        try {
+            const res = await getRecruiterStats();
+            if (res.success && res.data) {
+                setStatsData(res.data.stats);
+            }
+        } catch (error) {
+            console.error('Failed to fetch stats:', error);
+        }
+    }, []);
+
+    // Fetch recruiters
+    const fetchRecruiters = useCallback(async () => {
+        setIsLoading(true);
+        setCurrentPage(1);
+        setHasMoreRecruiters(true);
+
+        try {
+            const res = await getRecruiterActivity({ page: 1, limit: 10 });
+
+            if (res.success && res.data) {
+                setRecruiters(res.data.recruiters);
+                setHasMoreRecruiters(res.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to fetch recruiters:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Failed to load recruiters. Please try again.',
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3000,
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    }, []);
+
+    // Load more recruiters
+    const loadMoreRecruiters = useCallback(async () => {
+        if (isLoadingMore || !hasMoreRecruiters) return;
+
+        setIsLoadingMore(true);
+        try {
+            const nextPage = currentPage + 1;
+            const res = await getRecruiterActivity({ page: nextPage, limit: 10 });
+
+            if (res.success && res.data) {
+                setRecruiters((prev) => [...prev, ...res.data!.recruiters]);
+                setCurrentPage(nextPage);
+                setHasMoreRecruiters(res.meta?.pagination?.hasNextPage ?? false);
+            }
+        } catch (error) {
+            console.error('Failed to load more recruiters:', error);
+        } finally {
+            setIsLoadingMore(false);
+        }
+    }, [currentPage, isLoadingMore, hasMoreRecruiters]);
+
+    // Handle scroll for infinite loading
+    const handleTableScroll = useCallback(
+        (e: React.UIEvent<HTMLDivElement>) => {
+            const target = e.target as HTMLDivElement;
+            const scrollThreshold = 50;
+            if (target.scrollHeight - target.scrollTop - target.clientHeight < scrollThreshold) {
+                loadMoreRecruiters();
+            }
+        },
+        [loadMoreRecruiters]
+    );
+
     useEffect(() => {
         dispatch(setPageTitle('Recruiter Analytics'));
-    }, [dispatch]);
+        fetchStats();
+        fetchRecruiters();
+    }, [dispatch, fetchStats, fetchRecruiters]);
 
-    const cards = useMemo(() => recruiterSummary, []);
+    const cards = useMemo(() => {
+        if (!statsData) {
+            return [
+                { label: 'Active Recruiters', value: '—', helper: 'Loading...' },
+                { label: 'Open Positions', value: '—', helper: 'Loading...' },
+                { label: 'Interviews Conducted', value: '—', helper: 'Loading...' },
+                { label: 'Hires Confirmed', value: '—', helper: 'Loading...' },
+            ];
+        }
+
+        return [
+            {
+                label: 'Active Recruiters',
+                value: formatNumber(statsData.activeRecruiters.count),
+                helper: statsData.activeRecruiters.growthLabel,
+            },
+            {
+                label: 'Open Positions',
+                value: formatNumber(statsData.openPositions.count),
+                helper: statsData.openPositions.subLabel,
+            },
+            {
+                label: 'Interviews Conducted',
+                value: formatNumber(statsData.interviewsConducted.count),
+                helper: statsData.interviewsConducted.growthLabel,
+            },
+            {
+                label: 'Hires Confirmed',
+                value: formatNumber(statsData.hiresConfirmed.count),
+                helper: statsData.hiresConfirmed.growthLabel,
+            },
+        ];
+    }, [statsData]);
 
     return (
         <div className="space-y-8">
@@ -99,10 +190,14 @@ const Recruiter = () => {
                     </div>
                 </div>
 
-                <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700">
+                <div
+                    ref={tableContainerRef}
+                    onScroll={handleTableScroll}
+                    className="max-h-[500px] overflow-y-auto overflow-x-hidden rounded-2xl border border-slate-200 dark:border-slate-700"
+                >
                     <div className="overflow-x-auto">
                         <table className="min-w-[760px] divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
-                            <thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-300">
+                            <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/60 dark:text-slate-300">
                                 <tr>
                                     <th className="px-6 py-3">Company</th>
                                     <th className="px-6 py-3">Recruiter</th>
@@ -113,20 +208,91 @@ const Recruiter = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 bg-white text-sm dark:divide-slate-700 dark:bg-slate-900">
-                                {recruiterActivity.map((item) => (
-                                    <tr key={item.company} className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70">
-                                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">{item.company}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.recruiter}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.focus}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.interviews}</td>
-                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.updatedAt}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[item.status]}`}>
-                                                {item.status}
-                                            </span>
+                                {isLoading ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                            Loading recruiters...
                                         </td>
                                     </tr>
-                                ))}
+                                ) : recruiters.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center text-slate-500">
+                                            No recruiters found
+                                        </td>
+                                    </tr>
+                                ) : (
+                                    <>
+                                        {recruiters.map((item) => (
+                                            <tr
+                                                key={item._id}
+                                                className="text-slate-700 transition hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800/70"
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        {item.companyLogo ? (
+                                                            <img
+                                                                src={item.companyLogo}
+                                                                alt={item.company}
+                                                                className="h-8 w-8 rounded-full object-cover"
+                                                            />
+                                                        ) : (
+                                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                                                                {item.company.charAt(0).toUpperCase()}
+                                                            </div>
+                                                        )}
+                                                        <span className="font-medium text-slate-900 dark:text-white">{item.company}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.recruiter}</td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.focusArea}</td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">{item.interviews}</td>
+                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-300">
+                                                    {formatDateDisplay(item.lastUpdated)}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span
+                                                        className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[item.status] || 'bg-slate-100 text-slate-600'
+                                                            }`}
+                                                    >
+                                                        {item.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {isLoadingMore && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-4 text-center text-slate-500">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24">
+                                                            <circle
+                                                                className="opacity-25"
+                                                                cx="12"
+                                                                cy="12"
+                                                                r="10"
+                                                                stroke="currentColor"
+                                                                strokeWidth="4"
+                                                                fill="none"
+                                                            />
+                                                            <path
+                                                                className="opacity-75"
+                                                                fill="currentColor"
+                                                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                                            />
+                                                        </svg>
+                                                        Loading more...
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                        {!hasMoreRecruiters && recruiters.length > 0 && (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-3 text-center text-xs text-slate-400">
+                                                    No more recruiters
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
+                                )}
                             </tbody>
                         </table>
                     </div>
