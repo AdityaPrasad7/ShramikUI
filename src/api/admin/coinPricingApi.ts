@@ -17,7 +17,7 @@ export interface CoinPackageDto {
 
 export interface CoinRulesDto {
     coinCostPerApplication: number;
-    coinPerEmployeeCount: number;
+    coinCostPerJobPost: number;
 }
 
 export type UpdateCoinRulesPayload = Partial<CoinRulesDto>;
@@ -40,7 +40,7 @@ export const getCoinPricing = async (category: CoinPricingCategory) => {
     return (
         payload ?? {
             packages: [],
-            rules: { coinCostPerApplication: 0, coinPerEmployeeCount: 0 },
+            rules: { coinCostPerApplication: 0, coinCostPerJobPost: 0 },
         }
     );
 };

@@ -19,7 +19,7 @@ import {
 
 const defaultRules: CoinRulesDto = {
     coinCostPerApplication: 0,
-    coinPerEmployeeCount: 0,
+    coinCostPerJobPost: 0,
 };
 
 const defaultPackage: UpsertCoinPackagePayload & { id?: string } = {
@@ -80,8 +80,8 @@ const CoinPricing = () => {
         if (activeCategory === 'jobSeeker') {
             return `${rules.coinCostPerApplication ?? 0} coins per application`;
         }
-        return `${rules.coinPerEmployeeCount ?? 0} coins per employee`;
-    }, [activeCategory, rules.coinCostPerApplication, rules.coinPerEmployeeCount]);
+        return `${rules.coinCostPerJobPost ?? 0} coins per employee`;
+    }, [activeCategory, rules.coinCostPerApplication, rules.coinCostPerJobPost]);
 
     const handleSavePackage = async () => {
         if (!formState) return;
@@ -162,7 +162,7 @@ const CoinPricing = () => {
             if (activeCategory === 'jobSeeker') {
                 payload = { coinCostPerApplication: rules.coinCostPerApplication };
             } else {
-                payload = { coinPerEmployeeCount: rules.coinPerEmployeeCount };
+                payload = { coinCostPerJobPost: rules.coinCostPerJobPost };
             }
 
             const updated = await updateCoinRules(activeCategory, payload);
@@ -338,16 +338,16 @@ const CoinPricing = () => {
                     {activeCategory === 'recruiter' && (
                         <div>
                             <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
-                                Coin Per Employee Count
+                                Coin cost per job post
                             </label>
                             <input
                                 type="number"
                                 min={0}
-                                value={rules.coinPerEmployeeCount}
+                                value={rules.coinCostPerJobPost}
                                 onChange={(event) =>
                                     setRules((prev) => ({
                                         ...prev,
-                                        coinPerEmployeeCount: Number(event.target.value),
+                                        coinCostPerJobPost: Number(event.target.value),
                                     }))
                                 }
                                 className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
