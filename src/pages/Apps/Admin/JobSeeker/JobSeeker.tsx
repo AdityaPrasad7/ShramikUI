@@ -26,6 +26,8 @@ interface StatsData {
 const JobSeeker = () => {
     const dispatch = useDispatch();
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [debouncedSearch, setDebouncedSearch] = useState<string>('');
     const [categories, setCategories] = useState<string[]>(['All']);
 
     // API data states
@@ -85,6 +87,7 @@ const JobSeeker = () => {
                 page: resetList ? 1 : currentPage,
                 limit: 10,
                 category: selectedCategory !== 'All' ? selectedCategory : undefined,
+                search: debouncedSearch || undefined,
             });
 
             if (res.success && res.data) {
@@ -109,7 +112,7 @@ const JobSeeker = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [selectedCategory, currentPage]);
+    }, [selectedCategory, currentPage, debouncedSearch]);
 
     // Load more job seekers
     const loadMoreJobSeekers = useCallback(async () => {
@@ -122,6 +125,7 @@ const JobSeeker = () => {
                 page: nextPage,
                 limit: 10,
                 category: selectedCategory !== 'All' ? selectedCategory : undefined,
+                search: debouncedSearch || undefined,
             });
 
             if (res.success && res.data) {
@@ -134,7 +138,7 @@ const JobSeeker = () => {
         } finally {
             setIsLoadingMore(false);
         }
-    }, [selectedCategory, currentPage, isLoadingMore, hasMoreJobSeekers]);
+    }, [selectedCategory, currentPage, isLoadingMore, hasMoreJobSeekers, debouncedSearch]);
 
     // Handle scroll for infinite loading
     const handleTableScroll = useCallback(
@@ -154,10 +158,18 @@ const JobSeeker = () => {
         fetchStats();
     }, [dispatch, fetchCategories, fetchStats]);
 
-    // Fetch job seekers when category changes
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Fetch job seekers when category or search changes
     useEffect(() => {
         fetchJobSeekers(true);
-    }, [selectedCategory]);
+    }, [selectedCategory, debouncedSearch]);
 
     const cards = useMemo(() => {
         if (!statsData) {
@@ -221,25 +233,46 @@ const JobSeeker = () => {
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Top Job Seekers</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">High-intent candidates ready for immediate action.</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Filter by category:</span>
-                        <select
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
-                        >
-                            {categories.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    {cat === 'Non-Degree Holder'
-                                        ? 'ND (Non-Degree)'
-                                        : cat === 'ITI Holder'
-                                            ? 'ITI (Industrial Training Institute)'
-                                            : cat === 'Diploma Holder'
-                                                ? 'Diploma'
-                                                : cat}
-                                </option>
-                            ))}
-                        </select>
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Search Input */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search by name, phone, email..."
+                                className="w-64 rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2 text-sm text-slate-600 shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            />
+                            <svg
+                                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                            >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                        </div>
+                        {/* Category Filter */}
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Category:</span>
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            >
+                                {categories.map((cat) => (
+                                    <option key={cat} value={cat}>
+                                        {cat === 'Non-Degree Holder'
+                                            ? 'ND (Non-Degree)'
+                                            : cat === 'ITI Holder'
+                                                ? 'ITI (Industrial Training Institute)'
+                                                : cat === 'Diploma Holder'
+                                                    ? 'Diploma'
+                                                    : cat}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
 

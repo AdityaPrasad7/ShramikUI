@@ -34,6 +34,7 @@ import IconMenuDocumentation from '../Icon/Menu/IconMenuDocumentation';
 import IconMail from '../Icon/IconMail';
 import IconUsers from '../Icon/IconUsers';
 import IconUser from '../Icon/IconUser';
+import IconBell from '../Icon/IconBell';
 
 const Sidebar = () => {
     const [currentMenu, setCurrentMenu] = useState<string>('');
@@ -142,7 +143,7 @@ const Sidebar = () => {
                                     </div>
                                 </NavLink>
                             </li>
-                            
+
 
                             <li className="nav-item">
                                 <NavLink to="/specializations" className="group">
@@ -203,6 +204,15 @@ const Sidebar = () => {
                                     <div className="flex items-center">
                                         <IconMenuChat className="group-hover:!text-primary shrink-0" />
                                         <span className="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Feedback</span>
+                                    </div>
+                                </NavLink>
+                            </li>
+
+                            <li className="nav-item">
+                                <NavLink to="/push-notifications" className="group">
+                                    <div className="flex items-center">
+                                        <IconBell className="group-hover:!text-primary shrink-0" />
+                                        <span className="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">Push Notifications</span>
                                     </div>
                                 </NavLink>
                             </li>
@@ -786,7 +796,7 @@ const Sidebar = () => {
                                         <IconMenuDocumentation className="group-hover:!text-primary shrink-0" />
                                         <span className="ltr:pl-3 rtl:pr-3 text-black dark:text-[#506690] dark:group-hover:text-white-dark">{t('documentation')}</span>
                                     </div> */}
-                                {/* </NavLink>
+                            {/* </NavLink>
                             </li> */}
                         </ul>
                     </PerfectScrollbar>

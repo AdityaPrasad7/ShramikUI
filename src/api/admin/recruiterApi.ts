@@ -65,6 +65,7 @@ export interface RecruiterQueryParams {
     endDate?: string;
     page?: number;
     limit?: number;
+    search?: string;
 }
 
 /**

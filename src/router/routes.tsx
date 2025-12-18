@@ -13,6 +13,7 @@ const Feedback = lazy(() => import('../pages/Apps/Admin/Feedback/Feedback'));
 const EmailMarketing = lazy(() => import('../pages/Apps/Admin/EmailMarketing/EmailMarketing'));
 const JobSeeker = lazy(() => import('../pages/Apps/Admin/JobSeeker/JobSeeker'));
 const Recruiter = lazy(() => import('../pages/Apps/Admin/Recruiter/Recruiter'));
+const PushNotifications = lazy(() => import('../pages/Apps/Admin/PushNotifications/PushNotifications'));
 const Todolist = lazy(() => import('../pages/Apps/Todolist'));
 const Mailbox = lazy(() => import('../pages/Apps/Mailbox'));
 const Notes = lazy(() => import('../pages/Apps/Notes'));
@@ -178,6 +179,10 @@ const routes = [
     {
         path: '/recruiter',
         element: <Recruiter />,
+    },
+    {
+        path: '/push-notifications',
+        element: <PushNotifications />,
     },
     // {
     //     path: '/apps/todolist',

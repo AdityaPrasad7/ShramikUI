@@ -25,6 +25,8 @@ interface StatsData {
 
 const Recruiter = () => {
     const dispatch = useDispatch();
+    const [searchQuery, setSearchQuery] = useState<string>('');
+    const [debouncedSearch, setDebouncedSearch] = useState<string>('');
 
     // API data states
     const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +67,11 @@ const Recruiter = () => {
         setHasMoreRecruiters(true);
 
         try {
-            const res = await getRecruiterActivity({ page: 1, limit: 10 });
+            const res = await getRecruiterActivity({
+                page: 1,
+                limit: 10,
+                search: debouncedSearch || undefined,
+            });
 
             if (res.success && res.data) {
                 setRecruiters(res.data.recruiters);
@@ -85,7 +91,7 @@ const Recruiter = () => {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [debouncedSearch]);
 
     // Load more recruiters
     const loadMoreRecruiters = useCallback(async () => {
@@ -94,7 +100,11 @@ const Recruiter = () => {
         setIsLoadingMore(true);
         try {
             const nextPage = currentPage + 1;
-            const res = await getRecruiterActivity({ page: nextPage, limit: 10 });
+            const res = await getRecruiterActivity({
+                page: nextPage,
+                limit: 10,
+                search: debouncedSearch || undefined,
+            });
 
             if (res.success && res.data) {
                 setRecruiters((prev) => [...prev, ...res.data!.recruiters]);
@@ -106,7 +116,7 @@ const Recruiter = () => {
         } finally {
             setIsLoadingMore(false);
         }
-    }, [currentPage, isLoadingMore, hasMoreRecruiters]);
+    }, [currentPage, isLoadingMore, hasMoreRecruiters, debouncedSearch]);
 
     // Handle scroll for infinite loading
     const handleTableScroll = useCallback(
@@ -123,8 +133,20 @@ const Recruiter = () => {
     useEffect(() => {
         dispatch(setPageTitle('Recruiter Analytics'));
         fetchStats();
+    }, [dispatch, fetchStats]);
+
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery);
+        }, 400);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Fetch recruiters when search changes
+    useEffect(() => {
         fetchRecruiters();
-    }, [dispatch, fetchStats, fetchRecruiters]);
+    }, [debouncedSearch, fetchRecruiters]);
 
     const cards = useMemo(() => {
         if (!statsData) {
@@ -187,6 +209,24 @@ const Recruiter = () => {
                     <div>
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Recruiter Activity Snapshot</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">Recent highlights from our most engaged recruiters.</p>
+                    </div>
+                    {/* Search Input */}
+                    <div className="relative">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search by company, name, phone..."
+                            className="w-72 rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2 text-sm text-slate-600 shadow-sm transition placeholder:text-slate-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        />
+                        <svg
+                            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                        >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
                     </div>
                 </div>
 

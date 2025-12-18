@@ -73,6 +73,7 @@ export interface JobSeekerQueryParams {
     page?: number;
     limit?: number;
     category?: string;
+    search?: string;
 }
 
 /**
