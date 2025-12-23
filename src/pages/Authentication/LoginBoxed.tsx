@@ -76,7 +76,7 @@ const LoginBoxed = () => {
         <div className="min-h-screen bg-[#eaf4ff]">
             <div className="mx-auto flex min-h-screen max-w-6xl flex-col justify-center px-4 pb-10 pt-12 lg:flex-row lg:items-center lg:pb-16 lg:pt-18">
                 <header className="absolute left-6 top-8 flex items-center gap-3">
-                    <img src="/assets/images/logo.svg" alt="Sharmik" className="h-9 w-9" />
+                    <img src="/ShramikLogo.png" alt="Shramik" className="h-9 w-9" />
                     <div className="flex flex-col">
                         <span className="bg-gradient-to-r from-primary via-indigo-500 to-sky-400 bg-clip-text text-lg font-extrabold uppercase tracking-[0.4em] text-transparent">
                             SHRAMIK
@@ -153,13 +153,13 @@ const LoginBoxed = () => {
                     </form>
 
                     <div className="my-4 flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                        <span className="h-px flex-1 bg-slate-200" />
+                        {/* <span className="h-px flex-1 bg-slate-200" />
                         <span>OR</span>
-                        <span className="h-px flex-1 bg-slate-200" />
+                        <span className="h-px flex-1 bg-slate-200" /> */}
                     </div>
 
                     <div className="flex items-center justify-center gap-3">
-                        <button className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50">
+                        {/* <button className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50">
                             <IconGoogle className="h-4.5 w-4.5" />
                         </button>
                         <button className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50">
@@ -167,15 +167,17 @@ const LoginBoxed = () => {
                         </button>
                         <button className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50">
                             <IconApple className="h-4.5 w-4.5" />
-                        </button>
+                        </button> */}
                     </div>
 
+                    {/* New to Shramik? section removed
                     <p className="mt-8 text-center text-sm text-slate-500">
                         New to Shramik?{' '}
                         <Link to="/auth/boxed-signup" className="font-semibold text-primary hover:underline">
                             Create an account
                         </Link>
                     </p>
+                    */}
                 </section>
 
                 <aside className="mt-14 w-full max-w-md px-4 text-center lg:mt-0 lg:px-12 lg:text-left">

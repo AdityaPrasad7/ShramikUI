@@ -103,3 +103,70 @@ export const getJobSeekerCategories = async (): Promise<CategoriesResponse> => {
     const response = await axios.get<CategoriesResponse>('/api/admin/job-seekers/categories');
     return response.data;
 };
+
+export interface AllJobSeekersQueryParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    isBlocked?: string;
+    category?: string;
+}
+
+export interface AllJobSeekersItem {
+    _id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    gender?: string;
+    category: string;
+    specialization: string;
+    status: string;
+    isBlocked: boolean;
+    profilePhoto?: string;
+    coinBalance: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AllJobSeekersResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        jobSeekers: AllJobSeekersItem[];
+        pagination: {
+            currentPage: number;
+            totalPages: number;
+            totalCount: number;
+            limit: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+}
+
+/**
+ * Get all job seekers with comprehensive filters
+ */
+export const getAllJobSeekers = async (params?: AllJobSeekersQueryParams): Promise<AllJobSeekersResponse> => {
+    const response = await axios.get<AllJobSeekersResponse>('/api/admin/job-seekers/all', {
+        params,
+    });
+    return response.data;
+};
+
+/**
+ * Block a job seeker
+ */
+export const blockJobSeeker = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await axios.post(`/api/admin/job-seekers/${id}/block`);
+    return response.data;
+};
+
+/**
+ * Unblock a job seeker
+ */
+export const unblockJobSeeker = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await axios.post(`/api/admin/job-seekers/${id}/unblock`);
+    return response.data;
+};

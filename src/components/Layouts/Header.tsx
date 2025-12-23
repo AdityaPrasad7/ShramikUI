@@ -160,7 +160,7 @@ const Header = () => {
                 <div className="relative bg-white flex w-full items-center px-5 py-2.5 dark:bg-black">
                     <div className="horizontal-logo flex lg:hidden justify-between items-center ltr:mr-2 rtl:ml-2">
                         <Link to="/" className="main-logo flex items-center shrink-0">
-                            <img className="w-8 ltr:-ml-1 rtl:-mr-1 inline" src="/assets/images/logo.svg" alt="logo" />
+                            <img className="w-8 ltr:-ml-1 rtl:-mr-1 inline" src="/ShramikLogo.png" alt="logo" />
                             <span className="text-lg ltr:ml-2 rtl:mr-2 font-bold tracking-[0.4em] uppercase hidden md:inline text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-500 to-sky-400">
                                 Shramik
                             </span>
@@ -201,6 +201,7 @@ const Header = () => {
                         <div className="sm:ltr:mr-auto sm:rtl:ml-auto">
                             {/* Search bar removed */}
                         </div>
+                        {/* Theme toggle removed */}
                         <div>
                             {themeConfig.theme === 'light' ? (
                                 <button
@@ -241,6 +242,8 @@ const Header = () => {
                                 </button>
                             )}
                         </div>
+                       
+                        {/* Language selector removed
                         <div className="dropdown shrink-0">
                             <Dropdown
                                 offset={[0, 8]}
@@ -270,6 +273,7 @@ const Header = () => {
                                 </ul>
                             </Dropdown>
                         </div>
+                        */}
                         {/*
                         <div className="dropdown shrink-0">
                             <Dropdown

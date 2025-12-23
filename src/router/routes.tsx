@@ -12,7 +12,9 @@ const QuestionSetBuilder = lazy(() => import('../pages/Apps/Admin/QuestionSets/Q
 const Feedback = lazy(() => import('../pages/Apps/Admin/Feedback/Feedback'));
 const EmailMarketing = lazy(() => import('../pages/Apps/Admin/EmailMarketing/EmailMarketing'));
 const JobSeeker = lazy(() => import('../pages/Apps/Admin/JobSeeker/JobSeeker'));
+const AllJobSeekers = lazy(() => import('../pages/Apps/Admin/JobSeeker/AllJobSeekers'));
 const Recruiter = lazy(() => import('../pages/Apps/Admin/Recruiter/Recruiter'));
+const AllRecruiters = lazy(() => import('../pages/Apps/Admin/Recruiter/AllRecruiters'));
 const PushNotifications = lazy(() => import('../pages/Apps/Admin/PushNotifications/PushNotifications'));
 const Todolist = lazy(() => import('../pages/Apps/Todolist'));
 const Mailbox = lazy(() => import('../pages/Apps/Mailbox'));
@@ -177,8 +179,16 @@ const routes = [
         element: <JobSeeker />,
     },
     {
+        path: '/job-seeker/all',
+        element: <AllJobSeekers />,
+    },
+    {
         path: '/recruiter',
         element: <Recruiter />,
+    },
+    {
+        path: '/recruiter/all',
+        element: <AllRecruiters />,
     },
     {
         path: '/push-notifications',

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { setPageTitle } from '../../../../store/themeConfigSlice';
 import Swal from 'sweetalert2';
 import {
@@ -25,6 +26,7 @@ interface StatsData {
 
 const JobSeeker = () => {
     const dispatch = useDispatch();
+    const navigate = useNavigate();
     const [selectedCategory, setSelectedCategory] = useState<string>('All');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [debouncedSearch, setDebouncedSearch] = useState<string>('');
@@ -186,6 +188,8 @@ const JobSeeker = () => {
                 label: 'Active Profiles',
                 value: formatNumber(statsData.activeProfiles.count),
                 helper: statsData.activeProfiles.growthLabel,
+                onClick: () => navigate('/job-seeker/all'),
+                clickable: true,
             },
             {
                 label: 'Interviews Scheduled',
@@ -203,7 +207,7 @@ const JobSeeker = () => {
                 helper: statsData.skillsVerified.subLabel,
             },
         ];
-    }, [statsData]);
+    }, [statsData, navigate]);
 
     return (
         <div className="space-y-8">
@@ -218,11 +222,13 @@ const JobSeeker = () => {
                 {cards.map((card) => (
                     <article
                         key={card.label}
-                        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900"
+                        onClick={card.onClick}
+                        className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-slate-700 dark:bg-slate-900 ${card.clickable ? 'cursor-pointer hover:border-primary' : ''}`}
                     >
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">{card.label}</p>
                         <p className="mt-3 text-3xl font-semibold text-slate-900 dark:text-white">{card.value}</p>
                         <span className="text-xs font-medium text-slate-400 dark:text-slate-500">{card.helper}</span>
+                        {card.clickable && <span className="block mt-1 text-xs text-primary">Click to view all →</span>}
                     </article>
                 ))}
             </section>

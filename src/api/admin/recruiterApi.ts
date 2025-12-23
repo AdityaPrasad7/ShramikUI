@@ -87,3 +87,68 @@ export const getRecruiterActivity = async (params?: RecruiterQueryParams): Promi
     });
     return response.data;
 };
+
+export interface AllRecruitersQueryParams {
+    page?: number;
+    limit?: number;
+    search?: string;
+    status?: string;
+    isBlocked?: string;
+}
+
+export interface AllRecruitersItem {
+    _id: string;
+    companyName: string;
+    name: string;
+    phone: string;
+    email?: string;
+    businessType?: string;
+    status: string;
+    isBlocked: boolean;
+    companyLogo?: string;
+    coinBalance: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface AllRecruitersResponse {
+    success: boolean;
+    message: string;
+    data?: {
+        recruiters: AllRecruitersItem[];
+        pagination: {
+            currentPage: number;
+            totalPages: number;
+            totalCount: number;
+            limit: number;
+            hasNextPage: boolean;
+            hasPrevPage: boolean;
+        };
+    };
+}
+
+/**
+ * Get all recruiters with comprehensive filters
+ */
+export const getAllRecruiters = async (params?: AllRecruitersQueryParams): Promise<AllRecruitersResponse> => {
+    const response = await axios.get<AllRecruitersResponse>('/api/admin/recruiters/all', {
+        params,
+    });
+    return response.data;
+};
+
+/**
+ * Block a recruiter
+ */
+export const blockRecruiter = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await axios.post(`/api/admin/recruiters/${id}/block`);
+    return response.data;
+};
+
+/**
+ * Unblock a recruiter
+ */
+export const unblockRecruiter = async (id: string): Promise<{ success: boolean; message: string }> => {
+    const response = await axios.post(`/api/admin/recruiters/${id}/unblock`);
+    return response.data;
+};

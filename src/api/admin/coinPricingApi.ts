@@ -15,9 +15,19 @@ export interface CoinPackageDto {
     updatedAt: string;
 }
 
+export interface ReferralSettingsDto {
+    isEnabled: boolean;
+    referrerCoins: number;
+    refereeCoins: number;
+    maxReferralsPerUser: number;
+}
+
 export interface CoinRulesDto {
+    baseAmount: number;
+    baseCoins: number;
     coinCostPerApplication: number;
     coinCostPerJobPost: number;
+    referralSettings?: ReferralSettingsDto;
 }
 
 export type UpdateCoinRulesPayload = Partial<CoinRulesDto>;
@@ -40,7 +50,7 @@ export const getCoinPricing = async (category: CoinPricingCategory) => {
     return (
         payload ?? {
             packages: [],
-            rules: { coinCostPerApplication: 0, coinCostPerJobPost: 0 },
+            rules: { baseAmount: 100, baseCoins: 100, coinCostPerApplication: 0, coinCostPerJobPost: 0 },
         }
     );
 };

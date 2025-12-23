@@ -18,8 +18,16 @@ import {
 } from '../../../../api/admin/coinPricingApi';
 
 const defaultRules: CoinRulesDto = {
+    baseAmount: 100,
+    baseCoins: 100,
     coinCostPerApplication: 0,
     coinCostPerJobPost: 0,
+    referralSettings: {
+        isEnabled: true,
+        referrerCoins: 50,
+        refereeCoins: 20,
+        maxReferralsPerUser: 0,
+    },
 };
 
 const defaultPackage: UpsertCoinPackagePayload & { id?: string } = {
@@ -158,12 +166,23 @@ const CoinPricing = () => {
         setIsSavingRules(true);
         setError(null);
         try {
-            let payload: UpdateCoinRulesPayload;
+            let payload: UpdateCoinRulesPayload = {
+                baseAmount: rules.baseAmount,
+                baseCoins: rules.baseCoins,
+            };
             if (activeCategory === 'jobSeeker') {
-                payload = { coinCostPerApplication: rules.coinCostPerApplication };
+                payload.coinCostPerApplication = rules.coinCostPerApplication;
             } else {
-                payload = { coinCostPerJobPost: rules.coinCostPerJobPost };
+                payload.coinCostPerJobPost = rules.coinCostPerJobPost;
             }
+
+            // Include referral settings
+            if (rules.referralSettings) {
+                payload.referralSettings = rules.referralSettings;
+            }
+
+            console.log('[FRONTEND] Sending payload:', payload);
+            console.log('[FRONTEND] Current rules state:', rules);
 
             const updated = await updateCoinRules(activeCategory, payload);
             setRules(updated);
@@ -188,11 +207,10 @@ const CoinPricing = () => {
                             key={category.value}
                             type="button"
                             onClick={() => setActiveCategory(category.value)}
-                            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                                activeCategory === category.value
-                                    ? 'border-primary bg-primary text-white'
-                                    : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
-                            }`}
+                            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${activeCategory === category.value
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200'
+                                }`}
                         >
                             {category.label}
                         </button>
@@ -297,12 +315,70 @@ const CoinPricing = () => {
                 </div>
             </section>
 
+            {/* Custom Amount Pricing - Separate Section */}
+            <section className="panel space-y-6">
+                <header className="mb-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Custom Amount Pricing</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Set the coin conversion rate for custom amount purchases.
+                    </p>
+                </header>
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+                            Amount (₹)
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            value={rules.baseAmount}
+                            onChange={(event) =>
+                                setRules((prev) => ({
+                                    ...prev,
+                                    baseAmount: Number(event.target.value),
+                                }))
+                            }
+                            className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+                            Coins
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            value={rules.baseCoins}
+                            onChange={(event) =>
+                                setRules((prev) => ({
+                                    ...prev,
+                                    baseCoins: Number(event.target.value),
+                                }))
+                            }
+                            className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                        />
+                    </div>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                    For ₹{rules.baseAmount}, user gets <span className="font-semibold text-primary">{rules.baseCoins} coins</span>
+                </p>
+                <button
+                    type="button"
+                    onClick={handleSaveRules}
+                    disabled={isSavingRules}
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
+                >
+                    {isSavingRules ? 'Saving...' : 'Save Pricing'}
+                </button>
+            </section>
+
+            {/* Rules Section */}
             <section className="panel space-y-6">
                 <header className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Rules</h2>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
-                            Configure the base coin costs for various actions in the application.
+                            Configure the coin cost for actions in the application.
                         </p>
                     </div>
                     <span className="inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-4 py-1 text-xs font-semibold text-primary dark:border-primary/40 dark:bg-primary/20">
@@ -316,6 +392,7 @@ const CoinPricing = () => {
                         handleSaveRules();
                     }}
                 >
+                    {/* Action Cost Rules */}
                     {activeCategory === 'jobSeeker' && (
                         <div>
                             <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -364,6 +441,104 @@ const CoinPricing = () => {
                 </form>
             </section>
 
+            {/* Referral Settings Section */}
+            <section className="panel space-y-6">
+                <header className="mb-6">
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Referral Settings</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Configure how many coins referrers get when someone signs up using their code.
+                    </p>
+                </header>
+                <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <label className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                            Enable Referral Rewards
+                        </label>
+                        <label className="relative inline-flex cursor-pointer items-center">
+                            <input
+                                type="checkbox"
+                                className="peer sr-only"
+                                checked={rules.referralSettings?.isEnabled ?? true}
+                                onChange={(event) =>
+                                    setRules((prev) => ({
+                                        ...prev,
+                                        referralSettings: {
+                                            ...prev.referralSettings!,
+                                            isEnabled: event.target.checked,
+                                        },
+                                    }))
+                                }
+                            />
+                            <div className="h-5 w-9 rounded-full bg-slate-200 transition peer-checked:bg-primary"></div>
+                            <div className="absolute left-0.5 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white transition peer-checked:translate-x-4 peer-checked:bg-white"></div>
+                        </label>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+                                Coins for Referrer
+                            </label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={rules.referralSettings?.referrerCoins ?? 50}
+                                onChange={(event) =>
+                                    setRules((prev) => ({
+                                        ...prev,
+                                        referralSettings: {
+                                            ...prev.referralSettings!,
+                                            referrerCoins: Number(event.target.value),
+                                        },
+                                    }))
+                                }
+                                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">Coins given to the person who shared the referral code</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">
+                                Max Referrals Per User (0 = Unlimited)
+                            </label>
+                            <input
+                                type="number"
+                                min={0}
+                                value={rules.referralSettings?.maxReferralsPerUser ?? 0}
+                                onChange={(event) =>
+                                    setRules((prev) => ({
+                                        ...prev,
+                                        referralSettings: {
+                                            ...prev.referralSettings!,
+                                            maxReferralsPerUser: Number(event.target.value),
+                                        },
+                                    }))
+                                }
+                                className="mt-2 w-full rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            />
+                            <p className="mt-1 text-xs text-slate-500">Maximum number of successful referrals per user</p>
+                        </div>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-800">
+                        <p className="text-sm text-slate-600 dark:text-slate-300">
+                            <span className="font-semibold">Current Setting:</span> When someone signs up using a referral code, the referrer gets{' '}
+                            <span className="font-semibold text-primary">{rules.referralSettings?.referrerCoins ?? 50} coins</span>.
+                            {(rules.referralSettings?.maxReferralsPerUser ?? 0) > 0 ? (
+                                <> (max {rules.referralSettings?.maxReferralsPerUser} referrals per user)</>
+                            ) : (
+                                <> (unlimited referrals)</>
+                            )}
+                        </p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleSaveRules}
+                        disabled={isSavingRules}
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-primary/60"
+                    >
+                        {isSavingRules ? 'Saving...' : 'Save Referral Settings'}
+                    </button>
+                </div>
+            </section>
+
             {formState && (
                 <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 px-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
@@ -380,9 +555,9 @@ const CoinPricing = () => {
                                         setFormState((prev) =>
                                             prev
                                                 ? {
-                                                      ...prev,
-                                                      data: { ...prev.data, name: event.target.value },
-                                                  }
+                                                    ...prev,
+                                                    data: { ...prev.data, name: event.target.value },
+                                                }
                                                 : prev,
                                         )
                                     }
@@ -400,9 +575,9 @@ const CoinPricing = () => {
                                             setFormState((prev) =>
                                                 prev
                                                     ? {
-                                                          ...prev,
-                                                          data: { ...prev.data, coins: Number(event.target.value) },
-                                                      }
+                                                        ...prev,
+                                                        data: { ...prev.data, coins: Number(event.target.value) },
+                                                    }
                                                     : prev,
                                             )
                                         }
@@ -419,9 +594,9 @@ const CoinPricing = () => {
                                             setFormState((prev) =>
                                                 prev
                                                     ? {
-                                                          ...prev,
-                                                          data: { ...prev.data, price: Number(event.target.value) },
-                                                      }
+                                                        ...prev,
+                                                        data: { ...prev.data, price: Number(event.target.value) },
+                                                    }
                                                     : prev,
                                             )
                                         }
@@ -440,9 +615,9 @@ const CoinPricing = () => {
                                             setFormState((prev) =>
                                                 prev
                                                     ? {
-                                                          ...prev,
-                                                          data: { ...prev.data, isVisible: event.target.checked },
-                                                      }
+                                                        ...prev,
+                                                        data: { ...prev.data, isVisible: event.target.checked },
+                                                    }
                                                     : prev,
                                             )
                                         }

@@ -82,7 +82,7 @@ const Sidebar = () => {
                 <div className="bg-white dark:bg-black h-full">
                     <div className="flex justify-between items-center px-4 py-3">
                         <NavLink to="/" className="main-logo flex items-center shrink-0">
-                            <img className="w-8 ml-[5px] flex-none" src="/assets/images/logo.svg" alt="logo" />
+                            <img className="w-8 ml-[5px] flex-none" src="/ShramikLogo.png" alt="logo" />
                             <div className="ltr:ml-3 rtl:mr-3 flex flex-col">
                                 <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-500 to-sky-400 text-lg font-extrabold uppercase tracking-[0.4em] leading-tight drop-shadow-sm">
                                     SHRAMIK
